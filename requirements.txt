@@ -1,0 +1,28 @@
+# Data prep
+datasets
+pandas
+
+# RAG
+faiss-cpu
+numpy
+sentence-transformers
+rank_bm25
+
+# Gemini
+google-genai
+websockets
+
+# Speech-to-text
+faster-whisper
+
+# Web framework
+fastapi
+uvicorn[standard]
+python-multipart
+
+# Database
+sqlalchemy[asyncio]
+asyncpg
+
+# Config
+python-dotenv
