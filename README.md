@@ -20,17 +20,14 @@ chat, built on a hybrid RAG pipeline and Gemini's dual text/audio models.
 
 ## Architecture
 
-Browser (text/voice)
-├─ Text → FastAPI → Gemini (text) ─┐
-└─ Voice → FastAPI → Whisper → Gemini Live (audio) ─┤
-├─→ RAG tool call
-FAISS + BM25 → rerank → answer
-│
-PostgreSQL (turn history)
+**Text path:** Browser → FastAPI → Gemini (text) → RAG tool call → reply
 
-Text and voice run through **separate Gemini sessions** — Live's audio
-output is session-wide, not per-turn, so routing text through it would
-mean generating and discarding speech on every typed reply.
+**Voice path:** Browser → FastAPI → Whisper (STT) → Gemini Live (audio) → RAG tool call → spoken + text reply
+
+Both paths call the same retrieval step: **FAISS + BM25 → cross-encoder rerank → answer**, and every turn is saved to **PostgreSQL**.
+
+Text and voice run through **separate Gemini sessions** — Live's audio output is session-wide, not per-turn, so routing text through it would mean generating and discarding speech on every typed reply.
+
 
 ## Notable engineering decisions
 
@@ -71,11 +68,13 @@ docker compose up --build
 
 ## Structure
 
-data/ dataset prep + company policy docs
-rag/ hybrid retriever + vector store
-gemini/ Live (voice) + text Gemini clients, RAG tool wrapper
-whisper/ speech-to-text
-conversation/ turn orchestration + fallback handling
-database/ SQLAlchemy models + async connection layer
-frontend/ vanilla JS/CSS chat UI
-main.py FastAPI app
+| Folder | Contents |
+|---|---|
+| `data/` | dataset prep + company policy docs |
+| `rag/` | hybrid retriever + vector store |
+| `gemini/` | Live (voice) + text Gemini clients, RAG tool wrapper |
+| `whisper/` | speech-to-text |
+| `conversation/` | turn orchestration + fallback handling |
+| `database/` | SQLAlchemy models + async connection layer |
+| `frontend/` | vanilla JS/CSS chat UI |
+| `main.py` | FastAPI app |
