@@ -8,10 +8,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Upgrade pip
+RUN pip install --no-cache-dir --upgrade pip
 
-# Bake in model weights at build time -- avoids slow/flaky downloads at runtime
+# 1. Install CPU PyTorch using extra-index-url
+RUN pip install --no-cache-dir torch --extra-index-url https://download.pytorch.org/whl/cpu
+
+# 2. COPY requirements.txt and install remaining packages with high network tolerance
+COPY requirements.txt .
+RUN pip install --no-cache-dir --default-timeout=1000 --retries=10 --index-url https://pypi.org/simple -r requirements.txt
+
+# Bake in model weights at build time
 RUN python -c "from sentence_transformers import SentenceTransformer, CrossEncoder; \
 SentenceTransformer('all-MiniLM-L6-v2'); \
 CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')"

@@ -14,6 +14,7 @@ load_dotenv()
 
 from fastapi import FastAPI, File, Form, UploadFile
 from fastapi.staticfiles import StaticFiles
+from starlette.types import Scope, Receive, Send
 from database.connections import init_db
 
 from conversation.turn_manager import TurnManager
@@ -74,9 +75,24 @@ async def lifespan(app: FastAPI):
         await tm.close()
 
 
+class SafeStaticFiles(StaticFiles):
+    """
+    Wraps StaticFiles to reject non-HTTP scopes (e.g. malformed WebSocket
+    probes from internet bots scanning for vulnerable devices) cleanly,
+    instead of raising an unhandled AssertionError that shows up as a
+    scary-looking traceback in the logs. Purely cosmetic -- the app never
+    actually crashed from this, uvicorn was already catching it safely.
+    """
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            return
+        await super().__call__(scope, receive, send)
+
+
 app = FastAPI(lifespan=lifespan)
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", SafeStaticFiles(directory="static"), name="static")
 
 
 async def _get_or_create_session(conversation_id: str) -> TurnManager:
@@ -186,7 +202,7 @@ async def end_conversation(conversation_id: str = Form(...)):
     return {"status": "closed"}
 
 
-app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
+app.mount("/", SafeStaticFiles(directory="frontend", html=True), name="frontend")
 
 
 if __name__ == "__main__":
