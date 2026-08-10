@@ -1,13 +1,21 @@
 """
-Wraps rag/retriever.py as a Gemini Live function-calling tool.
-
-Gemini decides *when* to call this tool
-""" 
+Gemini function-calling tool wrapping rag/retriever.py, shared by
+TextSession and LiveCallSession. Retriever is built lazily on first call,
+not at import time, so importing this module doesn't require live
+Pinecone credentials.
+"""
 
 from rag.retriever import Retriever
 
-# Loaded once at import time (module-level), not per-call 
-_retriever = Retriever()
+_retriever: Retriever | None = None
+
+
+def _get_retriever() -> Retriever:
+    global _retriever
+    if _retriever is None:
+        _retriever = Retriever()
+    return _retriever
+
 
 RAG_TOOL_DECLARATION = {
     "name": "search_knowledge_base",
@@ -35,9 +43,9 @@ TOOLS = [{"function_declarations": [RAG_TOOL_DECLARATION]}]
 
 def execute_tool(name: str, args: dict) -> dict:
     """
-    Called by live_client.py whenever Gemini invokes a tool. Returns a plain
-    dict -- this becomes the tool's function response, which Gemini reads
-    before composing its spoken reply.
+    Called by text_client.py / live_client.py whenever Gemini invokes a
+    tool. Returns a plain dict -- this becomes the tool's function
+    response, which Gemini reads before composing its reply.
     """
     if name != "search_knowledge_base":
         return {"error": f"Unknown tool: {name}"}
@@ -46,10 +54,10 @@ def execute_tool(name: str, args: dict) -> dict:
     if not query:
         return {"found": False, "message": "No query provided."}
 
-    results = _retriever.search(query)
+    results = _get_retriever().search(query)
 
     if not results:
-        # Honesty fallback 
+        # Honesty fallback
         return {
             "found": False,
             "message": (

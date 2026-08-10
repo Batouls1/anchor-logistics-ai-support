@@ -1,11 +1,7 @@
 """
-Non-Live path for typed messages.
-
-Live's audio output is set per-session, not per-turn -- so using it for
-text would mean generating (and discarding) speech on every text reply.
-This client uses plain generate_content instead: same RAG tool, no audio,
-no WebSocket. History is kept manually here since there's no Live session
-managing it for us.
+Non-Live path for typed messages and voice notes -- both share this
+TextSession/history. Plain generate_content, not Live, since audio
+output is session-wide, not per-turn.
 """
 
 import asyncio
@@ -44,9 +40,9 @@ not evidence the fact is false.
 
 class TextSession:
     """
-    One instance of this = one ongoing typed conversation. Kept as a
-    sibling to LiveSession, not a replacement -- TurnManager holds one of
-    each per conversation and routes based on input type.
+    One instance of this = one ongoing Path A conversation (typed
+    messages and voice-note transcripts alike). Owned by TurnManager,
+    one per conversation_id.
     """
 
     def __init__(self):

@@ -1,0 +1,10 @@
+.env
+.git
+.gitignore
+__pycache__/
+*.pyc
+venv/
+.venv/
+static/audio/*.wav
+*.wav
+response_*.wav

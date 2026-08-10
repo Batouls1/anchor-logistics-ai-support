@@ -1,7 +1,8 @@
 """
 SQLAlchemy models: one Conversation per conversation_id, many Turns per
-Conversation. Kept deliberately minimal for now
+Conversation. Kept deliberately minimal.
 """
+
 import uuid
 from datetime import datetime, timezone
 

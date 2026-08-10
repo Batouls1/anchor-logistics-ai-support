@@ -1,11 +1,8 @@
 """
-Tracks failed voice-transcription attempts within a single conversation
-and escalates the message after repeated failures.
-
-One instance of this belongs to one TurnManager (one conversation) --
+Tracks failed voice-transcription attempts per conversation and escalates
+the message after repeated failures. One instance per TurnManager --
 retry count is per-conversation, not global.
 """
-
 
 class FallbackHandler:
     def __init__(self, max_retries: int = 1):

@@ -3,7 +3,7 @@ datasets
 pandas
 
 # RAG
-faiss-cpu
+pinecone
 numpy
 sentence-transformers
 rank_bm25
@@ -26,3 +26,6 @@ asyncpg
 
 # Config
 python-dotenv
+
+# Testing
+pytest

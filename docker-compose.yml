@@ -27,7 +27,9 @@ services:
         condition: service_healthy
     volumes:
       - audio_data:/app/static/audio
+      - bm25_store:/app/rag/bm25_store
 
 volumes:
   postgres_data:
   audio_data:
+  bm25_store:

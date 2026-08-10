@@ -27,8 +27,14 @@ RUN python -c "from faster_whisper import WhisperModel; WhisperModel('small.en',
 
 COPY . .
 
-RUN mkdir -p static/audio
+RUN mkdir -p static/audio rag/bm25_store
+
+# Windows editors often save shell scripts with CRLF line endings, which
+# breaks execution in this Linux image with a confusing "no such file or
+# directory" error on a script that clearly exists. Stripping \r here
+# means this doesn't depend on every contributor's editor config.
+RUN sed -i 's/\r$//' docker-entrypoint.sh && chmod +x docker-entrypoint.sh
 
 EXPOSE 8000
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+ENTRYPOINT ["./docker-entrypoint.sh"]

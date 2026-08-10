@@ -1,8 +1,7 @@
 """
-English-only speech-to-text using faster-whisper.
-
-Loaded once at import time (module-level) -- reused across every voice
-note, same "load heavy things once" principle as the RAG retriever.
+English-only speech-to-text using faster-whisper, loaded once at import
+time and reused across every voice note. Safe to load eagerly here (no
+live credentials needed), unlike gemini/tools.py's lazy Retriever.
 """
 
 import os

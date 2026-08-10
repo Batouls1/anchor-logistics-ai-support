@@ -1,12 +1,10 @@
 """
-Async SQLAlchemy engine/session setup, plus small helper functions for the
-three things turn_manager.py needs: "make sure this conversation exists",
-"record a turn", and "fetch recent turns for reconnect replay."
+Async SQLAlchemy engine/session setup, plus helpers: create a
+conversation, record a turn, mark a conversation closed.
 """
 
 import os
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
 from database.models import Base, Conversation, Turn
@@ -48,23 +46,6 @@ async def record_turn(
             )
         )
         await session.commit()
-
-
-async def get_recent_turns(conversation_id: str, limit: int = 6) -> list[dict]:
-    
-    async with _SessionLocal() as session:
-        result = await session.execute(
-            select(Turn)
-            .where(Turn.conversation_id == conversation_id)
-            .where(Turn.is_fallback == False)  
-            .order_by(Turn.created_at.desc())
-            .limit(limit)
-        )
-        turns = list(result.scalars().all())
-        turns.reverse()  # oldest first
-        return [
-            {"user_text": t.user_text, "agent_text": t.agent_text} for t in turns
-        ]
 
 
 async def close_conversation(conversation_id: str) -> None:
