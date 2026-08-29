@@ -205,6 +205,46 @@ body {
   display: block;
 }
 
+/* ---------- Live call output device picker ---------- */
+
+.audio-device-bar {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  background: #f2f5f9;
+  border-bottom: 1px solid #e3e8ef;
+  padding: 7px 16px;
+  font-size: 12px;
+  color: #55606e;
+  flex-shrink: 0;
+}
+
+.audio-device-bar.visible {
+  display: flex;
+}
+
+.audio-device-bar label {
+  flex-shrink: 0;
+  font-weight: 600;
+}
+
+.audio-device-bar select {
+  flex: 1;
+  min-width: 0; /* lets long device names shrink instead of overflowing */
+  font: inherit;
+  color: inherit;
+  padding: 4px 6px;
+  border: 1px solid #d4dae3;
+  border-radius: 6px;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.audio-device-bar select:focus-visible {
+  outline: 2px solid #2f6fed;
+  outline-offset: 1px;
+}
+
 /* ---------- Message body ---------- */
 
 .chat-body {

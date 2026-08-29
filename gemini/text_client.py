@@ -53,6 +53,25 @@ class TextSession:
             tools=TOOLS,
         )
 
+    def prime_history(self, turns: list[tuple[str, str]]) -> None:
+        """
+        Replays previously stored exchanges into this session's history,
+        so a conversation picked up by a different process (or after a
+        restart) still remembers what was said.
+
+        Only the plain text of each turn is replayed -- tool calls and
+        their responses aren't reconstructed. The model doesn't need the
+        old retrieval steps, just what was actually said, and it calls
+        the tool again for anything it needs to look up.
+        """
+        for user_text, agent_text in turns:
+            self._history.append(
+                types.Content(role="user", parts=[types.Part(text=user_text)])
+            )
+            self._history.append(
+                types.Content(role="model", parts=[types.Part(text=agent_text)])
+            )
+
     async def send_message(self, text: str) -> str:
         self._history.append(
             types.Content(role="user", parts=[types.Part(text=text)])

@@ -41,6 +41,13 @@
     Unable to connect to support. Please refresh the page.
   </div>
 
+  <!-- Only shown during a live call. Device labels stay blank until mic
+       permission is granted, so the list is meaningless before then. -->
+  <div class="audio-device-bar" id="audioDeviceBar">
+    <label for="audioOutputSelect">Speaker</label>
+    <select id="audioOutputSelect" aria-label="Choose which device plays the call audio"></select>
+  </div>
+
   <main class="chat-body" id="chatBody">
     <div class="message-stack" id="messageStack" role="log" aria-live="polite" aria-relevant="additions" aria-label="Conversation">
       <div class="bubble assistant connecting" id="connectingBubble">

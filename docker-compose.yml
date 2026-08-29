@@ -1,13 +1,18 @@
 services:
   db:
     image: postgres:16
+    restart: unless-stopped
     environment:
-      POSTGRES_PASSWORD: devpassword
+      # Overridable from .env; the default keeps local setup zero-config.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
       POSTGRES_DB: anchor_logistics
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      # Bound to loopback: still reachable from psql on this machine, but
+      # not published to the wider network the way a bare "5432:5432"
+      # would be.
+      - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -16,20 +21,21 @@ services:
 
   app:
     build: .
+    restart: unless-stopped
     ports:
       - "8000:8000"
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:devpassword@db:5432/anchor_logistics
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-devpassword}@db:5432/anchor_logistics
     depends_on:
       db:
         condition: service_healthy
     volumes:
-      - audio_data:/app/static/audio
+      # Survives restarts so the multi-minute ingest only runs on a truly
+      # fresh volume (see docker-entrypoint.sh).
       - bm25_store:/app/rag/bm25_store
 
 volumes:
   postgres_data:
-  audio_data:
   bm25_store:

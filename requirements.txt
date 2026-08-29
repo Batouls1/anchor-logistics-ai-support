@@ -1,31 +1,40 @@
-# Data prep
-datasets
-pandas
+# PyTorch is deliberately absent: the Dockerfile installs the CPU-only
+# build from PyTorch's own index first, so the CUDA wheel never gets
+# resolved from PyPI. Install it the same way for local development:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
 
-# RAG
-pinecone
-numpy
-sentence-transformers
-rank_bm25
+# Data prep (used only by data/prepare_dataset.py and rag/ingest.py)
+datasets==5.0.0
+pandas==3.0.5
 
-# Gemini
-google-genai
-websockets
+# RAG: hybrid retrieval + reranking
+pinecone==9.1.0
+numpy==2.4.6
+sentence-transformers==5.6.0
+rank_bm25==0.2.2
 
-# Speech-to-text
-faster-whisper
+# Gemini (text + Live audio). websockets is the Live API's transport and
+# is imported directly for its connection-closed exception types.
+google-genai==2.14.0
+websockets==16.1.1
+
+# Speech-to-text (Path A voice notes)
+faster-whisper==1.2.1
 
 # Web framework
-fastapi
-uvicorn[standard]
-python-multipart
+fastapi==0.141.0
+uvicorn[standard]==0.52.0
+python-multipart==0.0.32
 
 # Database
-sqlalchemy[asyncio]
-asyncpg
+sqlalchemy[asyncio]==2.0.51
+asyncpg==0.31.0
 
 # Config
-python-dotenv
+python-dotenv==1.2.2
 
-# Testing
-pytest
+# Testing. httpx2 backs fastapi.testclient; Starlette deprecated the
+# older httpx backend, and without this pinned the suite prints a
+# deprecation warning on every run.
+pytest==9.1.1
+httpx2==2.12.0

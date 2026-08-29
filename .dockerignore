@@ -1,10 +1,24 @@
 .env
 .git
 .gitignore
+.dockerignore
+README.md
+
+# Python bytecode / build artifacts
 __pycache__/
 *.pyc
+*.pyo
+*.egg-info/
+
+# Local virtualenvs -- the image installs its own dependencies
 venv/
 .venv/
-static/audio/*.wav
+
+# Test artifacts (the suite itself is copied in; its caches aren't)
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+
 *.wav
-response_*.wav

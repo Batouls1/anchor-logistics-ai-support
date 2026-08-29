@@ -27,6 +27,35 @@ def mocked_turn_manager():
         yield tm, mock_text_session, mock_transcribe, mock_record_turn
 
 
+def test_starting_a_session_replays_stored_history():
+    """
+    The in-memory session store isn't the source of truth: after a
+    restart, or on a different worker, the conversation has to be rebuilt
+    from Postgres rather than silently starting blank.
+    """
+    stored = [("where is my order", "It ships in 2 days."), ("thanks", "Any time!")]
+
+    with patch("conversation.turn_manager.TextSession") as mock_cls, \
+         patch("conversation.turn_manager.get_or_create_conversation", new_callable=AsyncMock), \
+         patch("conversation.turn_manager.load_recent_turns", new_callable=AsyncMock) as mock_load:
+        mock_load.return_value = stored
+        tm = TurnManager("existing-conversation")
+        asyncio.run(tm.start())
+
+    mock_cls.return_value.prime_history.assert_called_once_with(stored)
+
+
+def test_starting_a_brand_new_conversation_replays_nothing():
+    with patch("conversation.turn_manager.TextSession") as mock_cls, \
+         patch("conversation.turn_manager.get_or_create_conversation", new_callable=AsyncMock), \
+         patch("conversation.turn_manager.load_recent_turns", new_callable=AsyncMock) as mock_load:
+        mock_load.return_value = []
+        tm = TurnManager("brand-new")
+        asyncio.run(tm.start())
+
+    mock_cls.return_value.prime_history.assert_not_called()
+
+
 def test_handle_text_uses_text_session_and_records_turn(mocked_turn_manager):
     tm, mock_text_session, _mock_transcribe, mock_record_turn = mocked_turn_manager
 

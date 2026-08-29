@@ -1,8 +1,8 @@
 # Anchor Logistics AI Support Assistant
 
-A production-shaped AI customer support assistant with two distinct
-conversation modes — text/voice-note chat and a live voice call — built
-on a hybrid RAG pipeline and Gemini's text and native-audio models.
+An AI customer support assistant with two deliberately separate
+conversation modes — a text chat and a real-time voice call — built on a
+hybrid RAG pipeline and Gemini's text and native-audio models.
 
 ## Features
 
@@ -10,106 +10,147 @@ on a hybrid RAG pipeline and Gemini's text and native-audio models.
   knowledge base via hybrid search (Pinecone + BM25 + cross-encoder
   reranking), never generated from model memory
 
-- **Two conversation modes, deliberately separate**
-  - **Chat (default):** typed messages and voice notes both go through
-    the same text conversation — a voice note is transcribed (Whisper)
-    and answered exactly like a typed message, sharing one history
-  - **Live call:** a separate real-time voice call using Gemini Live's
-    native audio understanding directly — continuous streamed audio, no
-    Whisper, its own session
+- **Chat mode** — typed messages and voice notes share one conversation;
+  a voice note is transcribed (Whisper) and answered like a typed message
 
-- **Persistent conversations** — every chat turn saved to PostgreSQL
+- **Live call mode** — real-time voice using Gemini Live's native audio.
+  Audio in, audio out, nothing else: no transcript is requested and no
+  text from a call ever reaches the chat window
 
-- **Resilient by design** — recovers from rate limits and failed
-  transcriptions without breaking the conversation
+- **Persistent history** — turns are saved to PostgreSQL and replayed
+  when a session is rebuilt, so restarts and extra workers don't lose
+  context
 
-- **Automated test suite** — 20 tests covering retrieval logic, turn
-  routing, and Live event translation
+- **Resilient** — rate limits, failed transcriptions, and an unreachable
+  knowledge base all degrade to a useful reply instead of an error page
 
-- **Fully containerized** — one command spins up the app + database
+- **110 automated tests**, no live credentials required
+
+- **Containerized** — one command spins up the app + database
 
 ## Architecture
 
-**Chat path (typed or voice note):**
-Browser → FastAPI → \ [Whisper, if voice] → Gemini (text) → RAG tool call → text reply
+**Chat:** Browser → FastAPI → [Whisper, if voice] → Gemini (text) → RAG tool → text reply
 
-**Live call path:**
-Browser (streamed mic audio) → FastAPI WebSocket → Gemini Live (native audio) → RAG tool call → streamed audio + transcript reply
+**Live call:** Browser (16kHz PCM) → FastAPI WebSocket → Gemini Live → RAG tool → audio back (24kHz PCM)
 
-Both paths call the same retrieval step: **Pinecone + BM25 → reciprocal
-rank fusion → cross-encoder rerank → answer**. The two paths are
-architecturally separate on purpose — Gemini Live's audio output is
-session-wide, not per-turn, so a model built for continuous voice can't
-also cleanly serve one-off text replies. Chat and Live call also don't
-share conversation history with each other.
+Both paths share one retrieval step: **Pinecone + BM25 → reciprocal rank
+fusion → cross-encoder rerank → answer**.
 
-## Notable engineering decisions
+The paths are separate on purpose. Gemini Live's audio output is
+session-wide rather than per-turn, so a model built for continuous voice
+can't cleanly serve one-off text replies. Keeping them apart means
+neither compromises for the other.
 
-- Retrieval threshold **calibrated empirically** against real adversarial
-  queries — the naive default rejected correct answers as often as bad
-  ones
-- Support prompt **never implies a service doesn't exist** just because
-  it's missing from the KB — a subtle hallucination pattern most support
-  bots miss
-- **Pinecone re-ingestion clears the index first** — vector ids are just
-  chunk positions, so a shrinking knowledge base would otherwise leave
-  orphaned vectors behind from a previous, larger run
-- **RAG's retriever loads lazily**, on first tool call rather than at
-  import time — keeps unit tests fast and independent of live credentials
-- **RAG inference runs off the event loop** (`asyncio.to_thread`) so one
-  conversation's retrieval can't stall every other concurrent session
+## Notable decisions
 
+- **Retrieval threshold calibrated empirically** against adversarial
+  queries; the naive default rejected correct answers as often as bad ones
+- **The prompt never implies a service doesn't exist** just because it's
+  missing from the knowledge base — including when retrieval fails
+  outright: "I can't check right now" must not become "we don't offer that"
+- **Re-ingestion clears the index first** — vector ids are chunk
+  positions, so a shrinking corpus would leave orphaned vectors behind
+- **The retriever warms at startup but stays lazy** — a cold load
+  mid-call is seconds, which Gemini Live won't wait for. If warm-up
+  fails the server still starts and retries; a degraded feature beats a
+  failed boot
+- **RAG runs off the event loop** (`asyncio.to_thread`) so one retrieval
+  can't stall every other session
+- **The live call re-enters `receive()` each turn** — the SDK's iterator
+  exhausts per turn, and treating that as a hang-up would end the call
+  after one exchange
 
-## Known limitations
+## Security
 
-- The Live call model is preview-tier (native audio streaming has no
-  stable equivalent yet) and doesn't reconnect-with-history if the
-  connection drops mid-call — a dropped call just ends, deliberately,
-  rather than silently resuming
-- Live call transcripts aren't persisted to Postgres in this pass
-- First container start runs the RAG ingest step (a few minutes) if the
-  local BM25 store doesn't already exist; subsequent restarts reuse it
+- **Signed conversation tokens** — `POST /conversation/start` returns
+  `<id>.<hmac>`, verified on every `/chat/*` call. Ids were previously
+  generated by the browser and trusted, letting anyone read or append to
+  another conversation. Set `SESSION_SECRET` in production
+- **Input limits** — 4 000 chars per message; voice notes streamed
+  against a 10 MB ceiling and rejected mid-upload
+- **Rate limiting** — per-conversation on `/chat/*`, per-address on
+  `/conversation/start` and `/ws/live-call`
+- **Request tracing** — one log line per request, id returned as
+  `X-Request-ID`
+- **Non-root container**, with the model cache readable after the
+  privilege drop
 
-## Tech stack
+## Audio device handling
 
-FastAPI · PostgreSQL + SQLAlchemy (async) · Gemini API (text) + Gemini
-Live (streaming voice) · Pinecone · BM25 · Sentence-Transformers
-(embeddings + reranking) · faster-whisper · Docker Compose · pytest ·
-vanilla JS/CSS
+Live calls hit two hardware behaviours that cause total silence with no
+error anywhere:
 
-## Run it locally
+- **Bluetooth profile switching** — a headset can't run stereo (A2DP)
+  output and its mic at once. Opening the mic forces hands-free mode and
+  the stereo endpoint goes dead. Playback follows the mic to the
+  headset's hands-free endpoint
+- **OS output re-routing** — Windows reassigns audio output once a mic
+  goes live, so playback is pinned with `setSinkId` to a concrete device
+  rather than the `default` alias
+
+A **speaker picker** appears during a call; the automatic choice is the
+default, the user can override it, and the choice is remembered.
+
+## Run it
 
 ```bash
-git clone https://github.com/batouls1/anchor-logistics-ai-support
-cd anchor-logistics-ai-support
-cp .env.example .env   # add your GEMINI_API_KEY and PINECONE_API_KEY
+cp .env.example .env   # add GEMINI_API_KEY, PINECONE_API_KEY, SESSION_SECRET
 docker compose up --build
 ```
 → `http://localhost:8000`
 
-First run will take a few minutes longer than usual — the entrypoint
-script builds the local BM25 store automatically if it isn't already
-present.
+First run takes a few minutes longer — the entrypoint builds the BM25
+store if it isn't present.
+
+<details>
+<summary>Without Docker</summary>
+
+Needs PostgreSQL matching `DATABASE_URL` in `.env`.
+
+```bash
+pip install torch --index-url https://download.pytorch.org/whl/cpu
+pip install -r requirements.txt
+python rag/ingest.py     # once, to build the index + BM25 store
+python main.py
+```
+</details>
 
 ## Tests
 
 ```bash
 pytest
 ```
-20 tests covering RAG fusion/dedup/threshold logic, turn-routing between
-typed and voice input, and Gemini Live event translation. All external
-services (Pinecone, Gemini, Whisper) are mocked — the suite runs without
-live credentials.
+
+110 tests. Pinecone, Gemini, Whisper, and Postgres are all mocked, so the
+suite runs without credentials or a network. The frontend has no
+automated coverage — audio device selection and playback were verified by
+driving a real browser.
+
+## Known limitations
+
+- The Live model is preview-tier and doesn't reconnect with history; a
+  dropped call just ends
+- Live calls aren't persisted — by design, since no transcript exists
+- Bluetooth live calls run on the hands-free profile: mono and
+  narrowband. That's the Bluetooth spec, not the app
+- `setSinkId` is Chromium-only, so the speaker picker is hidden in
+  Firefox and Safari
+- Rate limits are per-process; behind N workers the ceiling is N × the
+  limit
+- No user accounts — a conversation token proves which conversation you
+  hold, not who you are
+- Schema is created with `create_all`, not migrations
 
 ## Structure
 
 | Folder | Contents |
 |---|---|
 | `data/` | dataset prep + company policy docs |
-| `rag/` | hybrid retriever (Pinecone + BM25) + ingest script |
-| `gemini/` | text client (Chat), Live client (Live call), RAG tool wrapper |
+| `rag/` | hybrid retriever + ingest script |
+| `gemini/` | text client, Live client, RAG tool wrapper |
 | `whisper/` | speech-to-text for voice notes |
-| `conversation/` | turn orchestration + transcription fallback handling |
+| `conversation/` | turn orchestration, fallback, session tokens, rate limiting |
 | `database/` | SQLAlchemy models + async connection layer |
 | `frontend/` | vanilla JS/CSS chat widget + live-call UI |
 | `tests/` | pytest suite |

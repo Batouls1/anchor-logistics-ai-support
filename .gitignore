@@ -13,8 +13,6 @@ __pycache__/
 # Data / generated artifacts
 data/bitext_dataset/processed.csv
 rag/bm25_store/*.pkl
-static/audio/*.wav
-response_*.wav
 
 # IDE
 .vscode/

@@ -35,9 +35,16 @@ def transcribe(audio_path: str) -> dict:
         segments, _info = _model.transcribe(
             audio_path,
             language="en",
-            beam_size=5,  
+            beam_size=5,
             vad_filter=True,
-            vad_parameters=dict(min_silence_duration_ms=500),
+            vad_parameters=dict(
+                min_silence_duration_ms=500,
+                threshold=0.3,       # default 0.5 was classifying short/
+                                     # quiet clips as pure silence with
+                                     # zero speech detected at all
+                speech_pad_ms=300,   # pad detected speech so quick words
+                                     # don't get clipped at the edges
+            ),
         )
         segments = list(segments)
     except Exception:

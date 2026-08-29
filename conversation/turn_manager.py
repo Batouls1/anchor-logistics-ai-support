@@ -11,7 +11,16 @@ from pathlib import Path
 from whisper.stt import transcribe
 from gemini.text_client import TextSession
 from conversation.fallback import FallbackHandler
-from database.connections import get_or_create_conversation, record_turn
+from database.connections import (
+    get_or_create_conversation,
+    load_recent_turns,
+    record_turn,
+)
+
+# How much prior conversation to replay when a session is rebuilt. Long
+# enough to keep context that matters, short enough that a long-running
+# conversation doesn't grow the prompt without bound.
+HISTORY_REPLAY_LIMIT = 20
 
 
 @dataclass
@@ -34,7 +43,23 @@ class TurnManager:
         self._fallback = FallbackHandler(max_retries=1)
 
     async def start(self):
+        """
+        Prepares the session, rebuilding its history from Postgres if the
+        conversation already exists.
+
+        This is what stops the in-memory session store from being a hard
+        single-process constraint: whichever worker picks up the next
+        request reconstructs the same conversation from durable storage
+        rather than starting blank. Restarts and multiple workers stop
+        silently losing context.
+        """
         await get_or_create_conversation(self._conversation_id)
+
+        previous_turns = await load_recent_turns(
+            self._conversation_id, limit=HISTORY_REPLAY_LIMIT
+        )
+        if previous_turns:
+            self._text_session.prime_history(previous_turns)
 
     async def close(self):
         # TextSession makes plain generate_content calls -- no persistent
