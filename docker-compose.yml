@@ -9,10 +9,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      # Bound to loopback: still reachable from psql on this machine, but
-      # not published to the wider network the way a bare "5432:5432"
-      # would be.
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s

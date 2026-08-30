@@ -3,8 +3,10 @@
 # resolved from PyPI. Install it the same way for local development:
 #   pip install torch --index-url https://download.pytorch.org/whl/cpu
 
-# Data prep (used only by data/prepare_dataset.py and rag/ingest.py)
-datasets==5.0.0
+# Data prep. `datasets` is dev-only -- it regenerates processed.csv and
+# is never imported by the server, so it stays out of the image.
+# Install it separately if you need to rebuild the dataset:
+#   pip install datasets
 pandas==3.0.5
 
 # RAG: hybrid retrieval + reranking

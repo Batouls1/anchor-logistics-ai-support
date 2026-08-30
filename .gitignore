@@ -11,7 +11,6 @@ __pycache__/
 .pytest_cache/
 
 # Data / generated artifacts
-data/bitext_dataset/processed.csv
 rag/bm25_store/*.pkl
 
 # IDE
